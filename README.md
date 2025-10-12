@@ -8,20 +8,35 @@ SimplePPA helps energy buyers evaluate the economic impact of different PPA cove
 
 ## Features
 
-- **Multi-scenario Analysis**: Evaluate PPA coverage from 0% to 200% of peak load in 10% increments
+- **Multi-scenario Analysis**: Evaluate PPA coverage at any range and step size (fully customizable)
 - **Flexible PPA Contracts**: Support for minimum take requirements and resale options
 - **ESS Integration**: Optional battery storage for excess solar energy
 - **Detailed Cost Breakdown**: Separate tracking of PPA costs, grid energy costs, and demand charges
-- **Two Interfaces**: Command-line script (`main.py`) and interactive GUI (`gui_app.py`)
+- **Three Interfaces**:
+  - **Streamlit Web GUI** (`main_gui.py`) - Interactive web interface with visualizations
+  - **Modular CLI** (`main_modular.py`) - Configuration-driven command line
+  - **Legacy Scripts** (`main.py`, `gui_app.py`) - Original implementations
+- **Modular Architecture**: Separate libraries for calculation, analysis, export, and configuration
 - **Comprehensive Export**: Excel output with hourly data, annual summaries, and pivot-ready formats
+- **Input Data Review**: Visual inspection of load, solar, and grid rate patterns before analysis
+- **Interactive Tooltips**: Contextual help for all configuration parameters
 
 ## Installation
 
 ### Requirements
 
 ```bash
-pip install pandas numpy openpyxl matplotlib tkinter
+pip install -r requirements.txt
 ```
+
+This installs:
+- pandas (≥2.0.0) - Data processing
+- numpy (≥1.24.0) - Numerical operations
+- openpyxl (≥3.1.0) - Excel I/O
+- matplotlib (≥3.7.0) - Static charts
+- plotly (≥5.17.0) - Interactive visualizations
+- streamlit (≥1.28.0) - Web GUI framework
+- altair (≥5.0.0) - Additional charting
 
 ### Data Files
 
@@ -31,30 +46,88 @@ Place the following files in the `data/` directory:
 
 ## Usage
 
-### Command Line Interface
+### 🌐 Streamlit Web GUI (Recommended)
 
+```bash
+streamlit run main_gui.py
+```
+
+**Features:**
+- **Interactive Configuration**: All parameters adjustable in sidebar with tooltips
+- **Data Review**: Preview and visualize input data before analysis
+  - Load and solar patterns with 7-day and daily average charts
+  - Grid rate distribution and hourly patterns
+  - Summary statistics and correlations
+- **Real-time Analysis**: Click "Run Analysis" to compute all scenarios
+- **Interactive Visualizations**:
+  - Cost analysis with optimal point highlighting
+  - Cost breakdown (stacked area chart)
+  - ESS comparison (savings visualization)
+  - Peak hour analysis
+- **Flexible Export**: Download results as Excel or individual CSVs
+- **Fully Customizable PPA Range**: Set any start/end/step (not limited to 0-200% in 10% steps)
+
+**Key Configuration Options:**
+- PPA Coverage Range: Start %, End %, Step % (e.g., 50-150% in 5% steps)
+- PPA Price: Fixed rate in KRW/kWh
+- Minimum Take: 0-100% (with optional purchase flexibility)
+- Resell Options: Enable/disable with configurable resell rate
+- ESS Parameters: Capacity and discharge price
+
+### 🖥️ Modular Command Line
+
+```bash
+python main_modular.py
+```
+
+**Configuration Methods:**
+
+1. **Edit in code** (`main_modular.py` lines 35-44):
+```python
+config = get_default_config()
+config['ppa_range_start'] = 50
+config['ppa_range_end'] = 150
+config['ppa_range_step'] = 5
+config['load_capacity_mw'] = 5000
+```
+
+2. **Use config file**:
+```python
+from libs.config import load_config_from_file
+config = load_config_from_file('my_config.json')
+```
+
+3. **Example config** (see `example_config.json`):
+```json
+{
+  "load_capacity_mw": 3000,
+  "ppa_price": 170,
+  "ppa_range_start": 0,
+  "ppa_range_end": 200,
+  "ppa_range_step": 10
+}
+```
+
+**Features:**
+- Configuration validation with error messages
+- Detailed console output with progress indicators
+- Automatic Excel export with comprehensive data
+- Peak hour analysis
+- Supports ESS analysis
+
+### 📊 Legacy Interfaces
+
+**Original CLI** (`main.py`):
 ```bash
 python main.py
 ```
+Edit parameters at top of file. Outputs detailed Excel file and console statistics.
 
-Edit parameters at the top of `main.py`:
-- `load_capacity_mw`: Maximum load capacity in MW
-- `ppa_price`: PPA price in KRW/kWh
-- `ppa_mintake`: Minimum required purchase (1.0 = 100%)
-- `ppa_resell`: Allow reselling excess PPA energy
-- `ess_include`: Enable ESS analysis
-
-### Graphical User Interface
-
+**Tkinter GUI** (`gui_app.py`):
 ```bash
 python gui_app.py
 ```
-
-The GUI provides:
-- Interactive parameter controls
-- Real-time visualization of results
-- Multiple chart types (cost analysis, coverage, patterns)
-- Export functionality
+Desktop GUI application with matplotlib charts.
 
 ## Algorithm Details
 
@@ -505,25 +578,55 @@ Choose ESS sizing:
 ### Project Structure
 ```
 simplePPA/
-├── main.py              # CLI analysis script
-├── gui_app.py           # GUI application
-├── libs/
-│   └── KEPCOutils.py    # Grid tariff processing
-├── data/
-│   ├── pattern.xlsx     # Load and solar patterns
-│   └── KEPCO.xlsx       # Grid rate data
-└── README.md            # This file
+├── main_gui.py              # Streamlit web GUI (recommended)
+├── main_modular.py          # Modular CLI with config support
+├── main.py                  # Legacy CLI script
+├── gui_app.py               # Legacy Tkinter GUI
+├── example_config.json      # Example configuration file
+├── requirements.txt         # Python dependencies
+├── libs/                    # Modular library components
+│   ├── calculator.py        # Core calculation engine
+│   ├── data_processor.py    # Data loading and transformation
+│   ├── analyzer.py          # Analysis and optimization logic
+│   ├── exporter.py          # Excel export and printing
+│   ├── config.py            # Configuration management
+│   └── KEPCOutils.py        # Korean grid tariff processing
+├── data/                    # Input data files
+│   ├── pattern.xlsx         # Load and solar patterns
+│   └── KEPCO.xlsx           # Grid rate data
+└── README.md                # This file
 ```
 
 ### Code Architecture
 
-Both `main.py` and `gui_app.py` share the same core function:
-- **calculate_ppa_cost()**: Hour-by-hour simulation engine
+**Modular Design:**
+- **libs/calculator.py**: Pure calculation logic (no I/O)
+  - `calculate_ppa_cost()`: Hour-by-hour simulation engine
+  - All parameters passed as arguments (no globals)
 
-The only differences are:
-- Parameter sources (global variables vs. GUI inputs)
-- Output handling (console/file vs. GUI display)
-- Results storage (comprehensive vs. summary only)
+- **libs/data_processor.py**: Data manipulation
+  - `load_pattern_data()`: Load Excel patterns
+  - `generate_scenario_columns()`: Create hourly scenario data
+  - `create_long_format_dataframe()`: Pivot-ready output
+
+- **libs/analyzer.py**: Business logic
+  - `run_scenario_analysis()`: Multi-scenario execution
+  - `run_ess_analysis()`: ESS-enabled analysis
+  - `find_optimal_scenario()`: Optimization
+
+- **libs/exporter.py**: Output formatting
+  - `export_to_excel()`: Multi-sheet Excel files
+  - Console printing utilities
+
+- **libs/config.py**: Configuration management
+  - `get_default_config()`: Default parameters
+  - `validate_config()`: Parameter validation
+  - `load_config_from_file()`: JSON/YAML support
+
+**Interface Implementations:**
+- `main_gui.py`: Uses all libs, adds Streamlit UI
+- `main_modular.py`: Uses all libs, CLI workflow
+- `main.py`, `gui_app.py`: Legacy monolithic implementations
 
 ## License
 
@@ -550,10 +653,21 @@ For issues or questions:
 
 ## Changelog
 
-### v0.1 (Current)
+### v0.2 (Current)
+- **NEW**: Streamlit web GUI with interactive visualizations
+- **NEW**: Modular architecture with separate library components
+- **NEW**: Fully customizable PPA coverage range (any start/end/step)
+- **NEW**: Input data review with charts and statistics
+- **NEW**: Interactive tooltips for all parameters
+- **NEW**: Configuration file support (JSON/YAML)
+- **NEW**: Clean requirements.txt for easy installation
+- Improved: Better code organization and reusability
+- Improved: Performance and maintainability
+
+### v0.1
 - Initial release
-- Hourly PPA analysis with 0-200% coverage
+- Hourly PPA analysis with fixed 0-200% in 10% steps
 - ESS integration
 - Resale mechanics
-- GUI and CLI interfaces
+- Original CLI (`main.py`) and Tkinter GUI (`gui_app.py`)
 - Comprehensive Excel export
