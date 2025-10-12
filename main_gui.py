@@ -57,12 +57,31 @@ def main():
 
         # Data Files
         st.subheader("📁 Data Files")
-        pattern_file = st.text_input("Pattern File", value="data/pattern.xlsx")
-        kepco_file = st.text_input("KEPCO File", value="data/KEPCO.xlsx")
-        kepco_year = st.number_input("KEPCO Year", value=2024, step=1)
-        kepco_tariff = st.selectbox("KEPCO Tariff",
-                                     ["HV_C_III", "HV_C_I", "HV_C_II"],
-                                     index=0)
+        pattern_file = st.text_input(
+            "Pattern File",
+            value="data/pattern.xlsx",
+            help="Excel file containing normalized hourly load and solar generation patterns (0-1 scale)"
+        )
+        kepco_file = st.text_input(
+            "KEPCO File",
+            value="data/KEPCO.xlsx",
+            help="Excel file with Korean electricity tariff data including rates and contract fees"
+        )
+        kepco_year = st.number_input(
+            "KEPCO Year",
+            value=2024,
+            step=1,
+            help="Year for which the tariff applies"
+        )
+        kepco_tariff = st.selectbox(
+            "KEPCO Tariff",
+            ["HV_C_III", "HV_C_I", "HV_C_II"],
+            index=0,
+            help="High Voltage tariff type:\n- HV_C_I: Option I\n- HV_C_II: Option II\n- HV_C_III: Option III (default)"
+        )
+
+        # Review Data Button
+        review_button = st.button("🔍 Review Data", use_container_width=True)
 
         st.divider()
 
@@ -70,92 +89,155 @@ def main():
         st.subheader("📅 Analysis Period")
         col1, col2 = st.columns(2)
         with col1:
-            start_date = st.date_input("Start Date",
-                                      value=pd.to_datetime("2024-01-01"))
+            start_date = st.date_input(
+                "Start Date",
+                value=pd.to_datetime("2024-01-01"),
+                help="First date to include in the analysis period"
+            )
         with col2:
-            end_date = st.date_input("End Date",
-                                    value=pd.to_datetime("2024-12-31"))
+            end_date = st.date_input(
+                "End Date",
+                value=pd.to_datetime("2024-12-31"),
+                help="Last date to include in the analysis period (typically one year)"
+            )
 
         st.divider()
 
         # Load Parameters
         st.subheader("⚡ Load Parameters")
-        load_capacity_mw = st.number_input("Load Capacity (MW)",
-                                          value=3000.0,
-                                          min_value=0.1,
-                                          step=100.0)
+        load_capacity_mw = st.number_input(
+            "Load Capacity (MW)",
+            value=3000.0,
+            min_value=0.1,
+            step=100.0,
+            help="Peak load capacity in megawatts. This scales the normalized load pattern to actual power consumption. Example: 100 MW means when normalized load = 1.0, actual load = 100 MW"
+        )
 
         st.divider()
 
         # PPA Parameters
         st.subheader("🌞 PPA Parameters")
-        ppa_price = st.number_input("PPA Price (KRW/kWh)",
-                                   value=170.0,
-                                   min_value=0.0,
-                                   step=1.0)
-        ppa_mintake = st.slider("Minimum Take (%)",
-                               min_value=0,
-                               max_value=100,
-                               value=100,
-                               step=1) / 100.0
-        ppa_resell = st.checkbox("Allow Reselling", value=False)
-        ppa_resellrate = st.slider("Resell Rate (%)",
-                                   min_value=0,
-                                   max_value=100,
-                                   value=90,
-                                   step=1,
-                                   disabled=not ppa_resell) / 100.0
+        ppa_price = st.number_input(
+            "PPA Price (KRW/kWh)",
+            value=170.0,
+            min_value=0.0,
+            step=1.0,
+            help="Fixed price per kWh for energy purchased from the PPA solar farm. This is the contracted rate you pay for solar electricity."
+        )
+        ppa_mintake = st.slider(
+            "Minimum Take (%)",
+            min_value=0,
+            max_value=100,
+            value=100,
+            step=1,
+            help="Minimum percentage of PPA generation that MUST be purchased each hour, regardless of need.\n- 100% = Must buy all generation (typical)\n- 80% = Must buy 80%, can optionally buy up to 100% if cheaper than grid\n- Lower values provide flexibility but may cost more"
+        ) / 100.0
+        ppa_resell = st.checkbox(
+            "Allow Reselling",
+            value=False,
+            help="Enable reselling excess PPA energy back to the grid. If disabled, excess energy is wasted (but already paid for)."
+        )
+        ppa_resellrate = st.slider(
+            "Resell Rate (%)",
+            min_value=0,
+            max_value=100,
+            value=90,
+            step=1,
+            disabled=not ppa_resell,
+            help="Percentage of PPA price received when reselling excess energy.\n- 90% = Resell at 90% of what you paid\n- Revenue reduces net PPA cost"
+        ) / 100.0
 
         st.divider()
 
         # PPA Coverage Range
-        st.subheader("📊 PPA Coverage Range")
+        st.subheader(
+            "📊 PPA Coverage Range",
+            help="PPA Coverage = (PPA Solar Farm Peak Capacity) / (Your Peak Load Capacity)\n\n"
+                 "Examples:\n"
+                 "• 0% = No PPA, grid only (baseline)\n"
+                 "• 50% = Solar farm half your peak load\n"
+                 "• 100% = Solar farm peak equals your peak load\n"
+                 "• 150% = Solar farm 1.5× larger than peak load\n"
+                 "• 200% = Solar farm twice your peak load\n\n"
+                 "Higher coverage = More solar generation but also more excess energy to manage"
+        )
+
         col1, col2, col3 = st.columns(3)
         with col1:
-            ppa_range_start = st.number_input("Start (%)",
-                                             value=0,
-                                             min_value=0,
-                                             step=10)
+            ppa_range_start = st.number_input(
+                "Start (%)",
+                value=0,
+                min_value=0,
+                step=10,
+                help="Starting PPA coverage percentage. 0% means no PPA (grid only), used as baseline."
+            )
         with col2:
-            ppa_range_end = st.number_input("End (%)",
-                                           value=200,
-                                           min_value=0,
-                                           step=10)
+            ppa_range_end = st.number_input(
+                "End (%)",
+                value=200,
+                min_value=0,
+                step=10,
+                help="Ending PPA coverage percentage. 200% means solar farm twice as large as peak load."
+            )
         with col3:
-            ppa_range_step = st.number_input("Step (%)",
-                                            value=10,
-                                            min_value=1,
-                                            step=1)
+            ppa_range_step = st.number_input(
+                "Step (%)",
+                value=10,
+                min_value=1,
+                step=1,
+                help="Increment between scenarios. Smaller steps = more detailed analysis but longer computation time.\n- 10% = Fast (21 scenarios for 0-200%)\n- 5% = Medium (41 scenarios)\n- 1% = Detailed (201 scenarios)"
+            )
 
-        num_scenarios = len(range(ppa_range_start, ppa_range_end + 1, ppa_range_step))
+        num_scenarios = len(range(int(ppa_range_start), int(ppa_range_end) + 1, int(ppa_range_step)))
         st.info(f"📈 {num_scenarios} scenarios will be analyzed")
 
         st.divider()
 
         # ESS Parameters
         st.subheader("🔋 ESS Parameters")
-        ess_include = st.checkbox("Include ESS Analysis", value=False)
-        ess_capacity = st.slider("ESS Capacity (% of solar peak)",
-                                min_value=0,
-                                max_value=200,
-                                value=50,
-                                step=10,
-                                disabled=not ess_include) / 100.0
-        ess_price = st.slider("ESS Discharge Price (% of PPA price)",
-                             min_value=0,
-                             max_value=100,
-                             value=50,
-                             step=5,
-                             disabled=not ess_include) / 100.0
+        ess_include = st.checkbox(
+            "Include ESS Analysis",
+            value=False,
+            help="Enable Energy Storage System analysis. ESS stores excess PPA energy for later use, reducing grid purchases and demand charges."
+        )
+        ess_capacity = st.slider(
+            "ESS Capacity (% of solar peak)",
+            min_value=0,
+            max_value=200,
+            value=50,
+            step=10,
+            disabled=not ess_include,
+            help="ESS storage capacity as percentage of peak solar generation.\n- 50% = Can store up to half of peak solar output\n- 100% = Can store full peak solar output\n- Larger ESS = More flexibility but higher capital cost"
+        ) / 100.0
+        ess_price = st.slider(
+            "ESS Discharge Price (% of PPA price)",
+            min_value=0,
+            max_value=100,
+            value=50,
+            step=5,
+            disabled=not ess_include,
+            help="Operating cost for using stored energy, as percentage of PPA price.\n- 50% = Discharging costs 50% of PPA price (typical)\n- Accounts for efficiency losses and O&M costs\n- Does not include capital cost (assumed external)"
+        ) / 100.0
 
         st.divider()
 
         # Output Options
         st.subheader("💾 Output Options")
-        output_file = st.text_input("Output Filename",
-                                    value="ppa_analysis_results.xlsx")
-        export_long_format = st.checkbox("Export Long Format", value=True)
-        verbose = st.checkbox("Verbose Output", value=False)
+        output_file = st.text_input(
+            "Output Filename",
+            value="ppa_analysis_results.xlsx",
+            help="Name of Excel file to save detailed analysis results. Contains hourly data, annual summaries, and cost breakdowns."
+        )
+        export_long_format = st.checkbox(
+            "Export Long Format",
+            value=True,
+            help="Generate detailed hourly data for all scenarios in pivot-table-ready format. Enables peak analysis but increases computation time."
+        )
+        verbose = st.checkbox(
+            "Verbose Output",
+            value=False,
+            help="Print detailed statistics for each scenario to console (useful for debugging)"
+        )
 
         st.divider()
 
@@ -163,6 +245,10 @@ def main():
         run_button = st.button("🚀 Run Analysis", type="primary", use_container_width=True)
 
     # Main content area
+    # Review Data functionality
+    if review_button:
+        review_input_data(pattern_file, kepco_file, kepco_year, kepco_tariff)
+
     if run_button:
         # Build configuration
         config = {
@@ -310,6 +396,253 @@ def main():
     # Display results if analysis has been done
     if st.session_state.analysis_done and st.session_state.results_summary is not None:
         display_results()
+
+
+def review_input_data(pattern_file, kepco_file, kepco_year, kepco_tariff):
+    """Review and visualize input data files."""
+    st.header("🔍 Input Data Review")
+
+    try:
+        # Load pattern data
+        with st.spinner("Loading pattern data..."):
+            load_df, solar_df, ppa_df = load_pattern_data(pattern_file)
+            pattern_df = pd.read_excel(pattern_file, index_col=0)
+
+        # Load KEPCO data
+        with st.spinner("Loading KEPCO data..."):
+            grid_df, contract_fee = kepco.process_kepco_data(
+                kepco_file,
+                int(kepco_year),
+                kepco_tariff
+            )
+
+        st.success("✅ Data loaded successfully!")
+
+        # Create tabs for different datasets
+        tab1, tab2, tab3 = st.tabs([
+            "📊 Load & Solar Patterns",
+            "⚡ Grid Rate Data",
+            "📈 Summary Statistics"
+        ])
+
+        with tab1:
+            st.subheader("Load and Solar Generation Patterns")
+
+            # Show data info
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total Data Points", f"{len(pattern_df):,}")
+                st.metric("Days of Data", f"{len(pattern_df)/24:.1f}")
+            with col2:
+                st.metric("Peak Load", f"{pattern_df['load'].max():.3f}")
+                st.metric("Peak Solar", f"{pattern_df['solar'].max():.3f}")
+
+            # Plot patterns
+            st.subheader("Hourly Patterns (First 7 Days)")
+            fig = make_subplots(
+                rows=2, cols=1,
+                subplot_titles=("Load Pattern", "Solar Generation Pattern"),
+                vertical_spacing=0.12
+            )
+
+            # Show first week
+            hours_to_show = min(168, len(pattern_df))  # 7 days or less
+            hours = list(range(hours_to_show))
+
+            # Load pattern
+            fig.add_trace(
+                go.Scatter(
+                    x=hours,
+                    y=pattern_df['load'].iloc[:hours_to_show],
+                    name='Load',
+                    line=dict(color='blue', width=2)
+                ),
+                row=1, col=1
+            )
+
+            # Solar pattern
+            fig.add_trace(
+                go.Scatter(
+                    x=hours,
+                    y=pattern_df['solar'].iloc[:hours_to_show],
+                    name='Solar',
+                    line=dict(color='orange', width=2),
+                    fill='tozeroy'
+                ),
+                row=2, col=1
+            )
+
+            fig.update_xaxes(title_text="Hour", row=2, col=1)
+            fig.update_yaxes(title_text="Normalized Load", row=1, col=1)
+            fig.update_yaxes(title_text="Normalized Generation", row=2, col=1)
+            fig.update_layout(height=600, showlegend=True)
+
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Daily average pattern
+            st.subheader("Average Daily Pattern")
+            if len(pattern_df) >= 24:
+                # Calculate average for each hour of day
+                pattern_df_copy = pattern_df.copy()
+                pattern_df_copy['hour'] = pattern_df_copy.index.hour if hasattr(pattern_df_copy.index, 'hour') else [i % 24 for i in range(len(pattern_df_copy))]
+                daily_avg = pattern_df_copy.groupby('hour').mean()
+
+                fig_daily = go.Figure()
+                fig_daily.add_trace(go.Scatter(
+                    x=daily_avg.index,
+                    y=daily_avg['load'],
+                    name='Avg Load',
+                    line=dict(color='blue', width=3),
+                    mode='lines+markers'
+                ))
+                fig_daily.add_trace(go.Scatter(
+                    x=daily_avg.index,
+                    y=daily_avg['solar'],
+                    name='Avg Solar',
+                    line=dict(color='orange', width=3),
+                    mode='lines+markers'
+                ))
+                fig_daily.update_layout(
+                    xaxis_title="Hour of Day",
+                    yaxis_title="Normalized Value",
+                    height=400,
+                    hovermode='x unified'
+                )
+                st.plotly_chart(fig_daily, use_container_width=True)
+
+            # Show data table
+            st.subheader("Data Preview (First 100 Rows)")
+            st.dataframe(pattern_df.head(100), use_container_width=True)
+
+            # Download button
+            csv = pattern_df.to_csv()
+            st.download_button(
+                "📥 Download Full Pattern Data (CSV)",
+                csv,
+                "pattern_data.csv",
+                "text/csv"
+            )
+
+        with tab2:
+            st.subheader("Grid Electricity Rate Data")
+
+            # Show data info
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Hours", f"{len(grid_df):,}")
+                st.metric("Date Range", f"{len(grid_df)/24:.1f} days")
+            with col2:
+                st.metric("Min Rate", f"{grid_df['rate'].min():.2f} KRW/kWh")
+                st.metric("Max Rate", f"{grid_df['rate'].max():.2f} KRW/kWh")
+            with col3:
+                st.metric("Avg Rate", f"{grid_df['rate'].mean():.2f} KRW/kWh")
+                st.metric("Contract Fee", f"{contract_fee:,.0f} KRW/kW")
+
+            # Plot rate over time
+            st.subheader("Grid Rate Over Time (First 30 Days)")
+            hours_to_show = min(720, len(grid_df))  # 30 days or less
+
+            fig_rate = go.Figure()
+            fig_rate.add_trace(go.Scatter(
+                x=list(range(hours_to_show)),
+                y=grid_df['rate'].iloc[:hours_to_show],
+                mode='lines',
+                name='Grid Rate',
+                line=dict(color='red', width=1),
+                fill='tozeroy'
+            ))
+            fig_rate.update_layout(
+                xaxis_title="Hour",
+                yaxis_title="Rate (KRW/kWh)",
+                height=400,
+                hovermode='x'
+            )
+            st.plotly_chart(fig_rate, use_container_width=True)
+
+            # Rate distribution
+            st.subheader("Rate Distribution")
+            fig_hist = go.Figure()
+            fig_hist.add_trace(go.Histogram(
+                x=grid_df['rate'],
+                nbinsx=50,
+                name='Rate Distribution',
+                marker=dict(color='red', line=dict(color='darkred', width=1))
+            ))
+            fig_hist.update_layout(
+                xaxis_title="Rate (KRW/kWh)",
+                yaxis_title="Frequency",
+                height=400
+            )
+            st.plotly_chart(fig_hist, use_container_width=True)
+
+            # Average rate by hour of day
+            st.subheader("Average Rate by Hour of Day")
+            grid_df_copy = grid_df.copy()
+            grid_df_copy['hour'] = grid_df_copy.index.hour if hasattr(grid_df_copy.index, 'hour') else [i % 24 for i in range(len(grid_df_copy))]
+            hourly_avg = grid_df_copy.groupby('hour')['rate'].mean()
+
+            fig_hourly = go.Figure()
+            fig_hourly.add_trace(go.Bar(
+                x=hourly_avg.index,
+                y=hourly_avg.values,
+                marker=dict(
+                    color=hourly_avg.values,
+                    colorscale='Reds',
+                    showscale=True,
+                    colorbar=dict(title="KRW/kWh")
+                )
+            ))
+            fig_hourly.update_layout(
+                xaxis_title="Hour of Day",
+                yaxis_title="Average Rate (KRW/kWh)",
+                height=400
+            )
+            st.plotly_chart(fig_hourly, use_container_width=True)
+
+            # Show data table
+            st.subheader("Data Preview (First 100 Rows)")
+            st.dataframe(grid_df.head(100), use_container_width=True)
+
+            # Download button
+            csv = grid_df.to_csv()
+            st.download_button(
+                "📥 Download Grid Rate Data (CSV)",
+                csv,
+                "grid_rate_data.csv",
+                "text/csv"
+            )
+
+        with tab3:
+            st.subheader("Summary Statistics")
+
+            # Pattern statistics
+            st.write("### Load & Solar Pattern Statistics")
+            stats_df = pattern_df.describe()
+            st.dataframe(stats_df, use_container_width=True)
+
+            # Grid rate statistics
+            st.write("### Grid Rate Statistics")
+            grid_stats_df = grid_df['rate'].describe().to_frame()
+            st.dataframe(grid_stats_df, use_container_width=True)
+
+            # Correlation if datetime index available
+            st.write("### Pattern Correlation")
+            correlation = pattern_df['load'].corr(pattern_df['solar'])
+            st.metric("Load vs Solar Correlation", f"{correlation:.3f}")
+
+            if correlation < 0:
+                st.info("Negative correlation: Solar generation peaks when load is lower (typical for residential)")
+            elif correlation > 0.5:
+                st.info("Strong positive correlation: Solar generation matches load demand well (typical for commercial)")
+            else:
+                st.info("Weak correlation: Solar generation and load are somewhat independent")
+
+    except FileNotFoundError as e:
+        st.error(f"❌ File not found: {str(e)}")
+        st.info("Please check that the file paths are correct and files exist.")
+    except Exception as e:
+        st.error(f"❌ Error loading data: {str(e)}")
+        st.exception(e)
 
 
 def display_results():
