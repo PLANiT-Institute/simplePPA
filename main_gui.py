@@ -27,7 +27,7 @@ from libs.analyzer import (
     create_cost_comparison,
     analyze_peak_hours
 )
-from libs.exporter import export_to_excel
+from libs.exporter import export_to_excel, export_to_excel_bytes
 
 
 # Page configuration
@@ -1380,20 +1380,21 @@ def export_results():
         st.warning("Detailed data not available. Enable 'Export Long Format' in configuration.")
         return
 
-    st.write("Click the button below to export results to Excel file.")
-
-    if st.button("💾 Export to Excel"):
-        try:
-            with st.spinner("Exporting..."):
-                export_to_excel(
-                    st.session_state.config['output_file'],
-                    st.session_state.long_df,
-                    st.session_state.annual_summary_df,
-                    st.session_state.cost_comparison_df
-                )
-            st.success(f"✅ Results exported to {st.session_state.config['output_file']}")
-        except Exception as e:
-            st.error(f"❌ Export failed: {str(e)}")
+    st.markdown("**Download to your computer**")
+    try:
+        excel_bytes = export_to_excel_bytes(
+            st.session_state.long_df,
+            st.session_state.annual_summary_df,
+            st.session_state.cost_comparison_df
+        )
+        st.download_button(
+            label="📥 Download Excel",
+            data=excel_bytes,
+            file_name=st.session_state.config.get('output_file', 'ppa_analysis_results.xlsx'),
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        st.error(f"❌ Failed to prepare download: {str(e)}")
 
     # Download buttons for individual tables
     st.subheader("Download Individual Tables")
@@ -1402,33 +1403,51 @@ def export_results():
 
     with col1:
         if 'cost_comparison_df' in st.session_state:
+            cost_csv_name = st.text_input(
+                "Cost Analysis filename",
+                value="cost_analysis.csv",
+                key="cost_csv_name"
+            )
             csv = st.session_state.cost_comparison_df.to_csv(index=False)
             st.download_button(
-                "📥 Cost Analysis CSV",
+                "📥 Download Cost Analysis CSV",
                 csv,
-                "cost_analysis.csv",
+                cost_csv_name,
                 "text/csv"
             )
+            
 
     with col2:
         if 'annual_summary_df' in st.session_state:
+            annual_csv_name = st.text_input(
+                "Annual Summary filename",
+                value="annual_summary.csv",
+                key="annual_csv_name"
+            )
             csv = st.session_state.annual_summary_df.to_csv(index=False)
             st.download_button(
-                "📥 Annual Summary CSV",
+                "📥 Download Annual Summary CSV",
                 csv,
-                "annual_summary.csv",
+                annual_csv_name,
                 "text/csv"
             )
+            
 
     with col3:
         if 'long_df' in st.session_state:
+            long_csv_name = st.text_input(
+                "Full Data filename",
+                value="full_data.csv",
+                key="long_csv_name"
+            )
             csv = st.session_state.long_df.to_csv(index=False)
             st.download_button(
-                "📥 Full Data CSV",
+                "📥 Download Full Data CSV",
                 csv,
-                "full_data.csv",
+                long_csv_name,
                 "text/csv"
             )
+            
 
 
 if __name__ == "__main__":

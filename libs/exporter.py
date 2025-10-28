@@ -174,6 +174,45 @@ def export_to_excel(filename, long_df, annual_summary_df, cost_comparison_df):
         cost_comparison_df.to_excel(writer, sheet_name='Cost_Analysis', index=False)
 
 
+def export_to_excel_bytes(long_df, annual_summary_df, cost_comparison_df):
+    """
+    Create an Excel workbook in-memory and return it as bytes.
+
+    Parameters
+    ----------
+    long_df : pd.DataFrame
+        Long-format analysis data
+    annual_summary_df : pd.DataFrame
+        Annual summary data
+    cost_comparison_df : pd.DataFrame
+        Cost comparison data
+
+    Returns
+    -------
+    bytes
+        Excel file contents as bytes suitable for Streamlit download
+    """
+    from io import BytesIO
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        # First sheet: Documentation
+        doc_df = create_documentation_dataframe()
+        doc_df.to_excel(writer, sheet_name='Documentation', index=False, header=False)
+
+        # Primary output: Long-format data for pivot analysis
+        long_df.to_excel(writer, sheet_name='PPA_Analysis_Data', index=False)
+
+        # Annual summary
+        annual_summary_df.to_excel(writer, sheet_name='Annual_Summary', index=False)
+
+        # Cost analysis
+        cost_comparison_df.to_excel(writer, sheet_name='Cost_Analysis', index=False)
+
+    output.seek(0)
+    return output.getvalue()
+
+
 def print_analysis_summary(config, analysis_df, results_summary, optimal_ppa, optimal_cost,
                           results_ess=None, optimal_ess_ppa=None, optimal_ess_cost=None,
                           ess_capacity_kwh=None, peak_solar_mw=None):
