@@ -2,11 +2,11 @@
 Core PPA cost calculation engine.
 """
 
-def calculate_ppa_cost(load_df, ppa_df, grid_df, load_capacity_mw, ppa_coverage,
+def calculate_ppa_cost(load_df, ppa_df, grid_df, emission_df, load_capacity_mw, ppa_coverage,
                        contract_fee, ppa_price, ppa_mintake, ppa_resell,
-                       ppa_resellrate, ess_price, ess_capacity=0, verbose=False):
+                       ppa_resellrate, ess_price, ppa_emission_factor=0.0, ess_capacity=0, verbose=False):
     """
-    Calculate total power cost for given load capacity and PPA coverage.
+    Calculate total power cost and emissions for given load capacity and PPA coverage.
 
     Parameters
     ----------
@@ -15,7 +15,9 @@ def calculate_ppa_cost(load_df, ppa_df, grid_df, load_capacity_mw, ppa_coverage,
     ppa_df : pd.DataFrame
         DataFrame with hourly solar generation pattern (normalized 0-1)
     grid_df : pd.DataFrame
-        DataFrame with hourly Grid rates (KRW/kWh)
+        DataFrame with hourly Grid rates (KRW/kWh) and emission factors
+    emission_df : pd.DataFrame
+        DataFrame with hourly grid emission factors (kgCO2e/kWh)
     load_capacity_mw : float
         Maximum load capacity in MW (e.g., 100 = 100MW peak load)
     ppa_coverage : float
@@ -32,6 +34,8 @@ def calculate_ppa_cost(load_df, ppa_df, grid_df, load_capacity_mw, ppa_coverage,
         Resale rate as fraction of PPA price
     ess_price : float
         ESS discharge cost as fraction of PPA price
+    ppa_emission_factor : float, optional
+        PPA emission factor in kgCO2e/kWh (default 0.0 for solar)
     ess_capacity : float, optional
         ESS capacity in kWh (0 = no ESS)
     verbose : bool, optional
@@ -40,12 +44,13 @@ def calculate_ppa_cost(load_df, ppa_df, grid_df, load_capacity_mw, ppa_coverage,
     Returns
     -------
     tuple
-        (total_cost, ppa_cost, grid_total_cost, grid_demand_cost, ess_cost)
+        (total_cost, ppa_cost, grid_total_cost, grid_demand_cost, ess_cost, total_emissions)
     """
 
     load = load_df['load']
     grid_rate = grid_df['rate']
     solar_generation = ppa_df['generation']
+    emission_factor = emission_df['emission']
 
     # Scale load by the specified capacity
     load_mw = load * load_capacity_mw
@@ -61,6 +66,11 @@ def calculate_ppa_cost(load_df, ppa_df, grid_df, load_capacity_mw, ppa_coverage,
     ppa_cost = 0
     grid_energy_cost = 0
     ess_cost = 0
+
+    # Initialize emissions tracking (kgCO2e)
+    total_emissions = 0
+    ppa_emissions = 0
+    grid_emissions = 0
 
     # Initialize ESS state
     ess_storage = 0
@@ -79,6 +89,7 @@ def calculate_ppa_cost(load_df, ppa_df, grid_df, load_capacity_mw, ppa_coverage,
         hour_load = load_kwh.iloc[hour]
         hour_grid_rate = grid_rate.iloc[hour]
         hour_ppa_gen = ppa_generation_kwh.iloc[hour]
+        hour_emission_factor = emission_factor.iloc[hour]
 
         # Mandatory PPA purchase (minimum take)
         mandatory_ppa = hour_ppa_gen * ppa_mintake
@@ -102,6 +113,9 @@ def calculate_ppa_cost(load_df, ppa_df, grid_df, load_capacity_mw, ppa_coverage,
         # Track how much load is actually met by PPA
         ppa_used_for_load = min(total_ppa_this_hour, hour_load)
         total_load_met_by_ppa += ppa_used_for_load
+
+        # Calculate PPA emissions (typically 0 for solar, but configurable)
+        ppa_emissions += ppa_used_for_load * ppa_emission_factor
 
         # After all PPA purchases, determine if we have excess or deficit
         remaining_load = hour_load - total_ppa_this_hour
@@ -140,13 +154,16 @@ def calculate_ppa_cost(load_df, ppa_df, grid_df, load_capacity_mw, ppa_coverage,
                 grid_energy_cost += remaining_load * hour_grid_rate
                 grid_demand_kw = remaining_load
                 peak_grid_demand_kw = max(peak_grid_demand_kw, grid_demand_kw)
+                # Calculate grid emissions
+                grid_emissions += remaining_load * hour_emission_factor
 
     # Calculate Grid demand charge
     grid_demand_cost = peak_grid_demand_kw * contract_fee
 
-    # Calculate total costs
+    # Calculate total costs and emissions
     grid_total_cost = grid_energy_cost + grid_demand_cost
     total_cost = ppa_cost + grid_total_cost + ess_cost
+    total_emissions = ppa_emissions + grid_emissions
 
     # Print statistics if verbose
     if verbose and ppa_coverage > 0:
@@ -163,5 +180,7 @@ def calculate_ppa_cost(load_df, ppa_df, grid_df, load_capacity_mw, ppa_coverage,
         print(f"  Grid Stats: Peak demand={peak_grid_demand_kw:,.0f} kW, "
               f"Energy cost={grid_energy_cost:,.0f} KRW, "
               f"Demand cost={grid_demand_cost:,.0f} KRW")
+        print(f"  Emissions: Total={total_emissions:,.0f} kgCO2e, "
+              f"PPA={ppa_emissions:,.0f} kgCO2e, Grid={grid_emissions:,.0f} kgCO2e")
 
-    return total_cost, ppa_cost, grid_total_cost, grid_demand_cost, ess_cost
+    return total_cost, ppa_cost, grid_total_cost, grid_demand_cost, ess_cost, total_emissions

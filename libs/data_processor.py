@@ -18,7 +18,7 @@ def load_pattern_data(filepath):
     Returns
     -------
     tuple
-        (load_df, solar_df, ppa_df) - DataFrames with normalized patterns
+        (load_df, solar_df, ppa_df, emission_df) - DataFrames with normalized patterns and emission factors
     """
     pattern_df = pd.read_excel(filepath, index_col=0)
 
@@ -30,10 +30,17 @@ def load_pattern_data(filepath):
     ppa_df = solar_df.copy()
     ppa_df.columns = ['generation']
 
-    return load_df, solar_df, ppa_df
+    # Load emission data if available (kgCO2e/kWh for grid electricity)
+    if 'emission' in pattern_df.columns:
+        emission_df = pattern_df[['emission']]
+    else:
+        # Default to zero if emission data not available
+        emission_df = pd.DataFrame({'emission': [0.0] * len(pattern_df)}, index=pattern_df.index)
+
+    return load_df, solar_df, ppa_df, emission_df
 
 
-def create_analysis_dataframe(grid_df, load_df, ppa_df, start_date, end_date, load_capacity_mw):
+def create_analysis_dataframe(grid_df, load_df, ppa_df, emission_df, start_date, end_date, load_capacity_mw):
     """
     Create base analysis DataFrame with filtered time range.
 
@@ -45,6 +52,8 @@ def create_analysis_dataframe(grid_df, load_df, ppa_df, start_date, end_date, lo
         Load pattern data
     ppa_df : pd.DataFrame
         PPA generation pattern data
+    emission_df : pd.DataFrame
+        Emission factor data (kgCO2e/kWh)
     start_date : str
         Start date (YYYY-MM-DD)
     end_date : str
@@ -55,14 +64,15 @@ def create_analysis_dataframe(grid_df, load_df, ppa_df, start_date, end_date, lo
     Returns
     -------
     pd.DataFrame
-        Analysis DataFrame with datetime, load, grid_rate, solar_generation
+        Analysis DataFrame with datetime, load, grid_rate, solar_generation, emission_factor
     """
     # Create base analysis DataFrame
     analysis_df = pd.DataFrame({
         'datetime': grid_df.index,
         'load': load_df['load'].values,
         'grid_rate': grid_df['rate'].values,
-        'solar_generation': ppa_df['generation'].values
+        'solar_generation': ppa_df['generation'].values,
+        'emission_factor': emission_df['emission'].values
     })
 
     # Filter data to user-defined timeframe
