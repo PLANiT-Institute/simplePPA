@@ -970,81 +970,71 @@ def display_results():
     # Check if carbon pricing is enabled
     has_carbon_price = st.session_state.config.get('carbon_price', 0.0) > 0
 
-    # Row 1: Basic optimal results
+    # Create summary table
+    st.subheader("Optimal Scenario Summary")
+
+    summary_data = []
+
+    # Without ESS results
+    summary_data.append({
+        'Scenario': 'Optimal (No ESS)',
+        'PPA Coverage (%)': f"{st.session_state.optimal_ppa}%",
+        'Total Cost (M KRW)': f"{st.session_state.optimal_cost/1e6:.1f}",
+        'Cost per kWh (KRW/kWh)': f"{(optimal_result['total_cost_with_carbon_per_kwh'] if has_carbon_price else optimal_result['total_cost_per_kwh']):.2f}",
+        'Emissions (tCO2e)': f"{optimal_result['total_emissions']/1000:.1f}",
+        'Emissions (kgCO2e/kWh)': f"{optimal_result['emissions_per_kwh']:.3f}"
+    })
+
+    # Add cost breakdown columns if carbon pricing is enabled
     if has_carbon_price:
-        col1, col2, col3, col4, col5 = st.columns(5)
-    else:
-        col1, col2, col3, col4 = st.columns(4)
+        summary_data[0]['Electricity Cost (M KRW)'] = f"{optimal_result['total_cost']/1e6:.1f}"
+        summary_data[0]['Carbon Cost (M KRW)'] = f"{optimal_result['carbon_cost']/1e6:.1f}"
+        summary_data[0]['Electricity (KRW/kWh)'] = f"{optimal_result['total_cost_per_kwh']:.2f}"
+        summary_data[0]['Carbon (KRW/kWh)'] = f"{optimal_result['carbon_cost_per_kwh']:.2f}"
 
-    with col1:
-        st.metric(
-            "Optimal PPA Coverage",
-            f"{st.session_state.optimal_ppa}%"
-        )
-
-    with col2:
-        st.metric(
-            "Optimal Total Cost" + (" (incl. Carbon)" if has_carbon_price else ""),
-            f"{st.session_state.optimal_cost/1e6:.1f}M KRW",
-            delta=f"{(optimal_result['total_cost_with_carbon_per_kwh'] if has_carbon_price else optimal_result['total_cost_per_kwh']):.2f} KRW/kWh"
-        )
-
-    with col3:
-        st.metric(
-            "Total Emissions",
-            f"{optimal_result['total_emissions']/1000:.1f} tCO2e",
-            delta=f"{optimal_result['emissions_per_kwh']:.3f} kgCO2e/kWh"
-        )
-
-    with col4:
-        if has_carbon_price:
-            st.metric(
-                "Carbon Cost Component",
-                f"{optimal_result['carbon_cost']/1e6:.1f}M KRW",
-                delta=f"{optimal_result['carbon_cost_per_kwh']:.2f} KRW/kWh"
-            )
-            with col5:
-                st.metric(
-                    "Electricity Cost Component",
-                    f"{optimal_result['total_cost']/1e6:.1f}M KRW",
-                    delta=f"{optimal_result['total_cost_per_kwh']:.2f} KRW/kWh"
-                )
-        else:
-            # No carbon pricing, show emissions only
-            pass  # Emissions already shown in col3
-
-    # Row 2: ESS comparison if available
+    # ESS comparison if available
     if 'results_ess' in st.session_state:
         optimal_ess_result = next(r for r in st.session_state.results_ess if r['ppa_percent'] == st.session_state.optimal_ess_ppa)
         savings = st.session_state.optimal_cost - st.session_state.optimal_ess_cost
 
-        col1, col2, col3 = st.columns(3)
+        ess_row = {
+            'Scenario': 'Optimal (With ESS)',
+            'PPA Coverage (%)': f"{st.session_state.optimal_ess_ppa}%",
+            'Total Cost (M KRW)': f"{st.session_state.optimal_ess_cost/1e6:.1f}",
+            'Cost per kWh (KRW/kWh)': f"{(optimal_ess_result['total_cost_with_carbon_per_kwh'] if has_carbon_price else optimal_ess_result['total_cost_per_kwh']):.2f}",
+            'Emissions (tCO2e)': f"{optimal_ess_result['total_emissions']/1000:.1f}",
+            'Emissions (kgCO2e/kWh)': f"{optimal_ess_result['emissions_per_kwh']:.3f}"
+        }
 
-        with col1:
-            st.metric(
-                "Optimal with ESS Coverage",
-                f"{st.session_state.optimal_ess_ppa}%"
-            )
+        if has_carbon_price:
+            ess_row['Electricity Cost (M KRW)'] = f"{optimal_ess_result['total_cost']/1e6:.1f}"
+            ess_row['Carbon Cost (M KRW)'] = f"{optimal_ess_result['carbon_cost']/1e6:.1f}"
+            ess_row['Electricity (KRW/kWh)'] = f"{optimal_ess_result['total_cost_per_kwh']:.2f}"
+            ess_row['Carbon (KRW/kWh)'] = f"{optimal_ess_result['carbon_cost_per_kwh']:.2f}"
 
-        with col2:
-            st.metric(
-                "Optimal ESS Total Cost",
-                f"{st.session_state.optimal_ess_cost/1e6:.1f}M KRW"
-            )
+        summary_data.append(ess_row)
 
-        with col3:
-            st.metric(
-                "Optimal ESS Cost per kWh",
-                f"{optimal_ess_result['total_cost_per_kwh']:.2f} KRW/kWh"
-            )
+        # Add savings row
+        savings_row = {
+            'Scenario': 'ESS Savings',
+            'PPA Coverage (%)': '-',
+            'Total Cost (M KRW)': f"{savings/1e6:.1f}",
+            'Cost per kWh (KRW/kWh)': f"{(optimal_result['total_cost_per_kwh'] - optimal_ess_result['total_cost_per_kwh']):.2f}",
+            'Emissions (tCO2e)': f"{(optimal_result['total_emissions'] - optimal_ess_result['total_emissions'])/1000:.1f}",
+            'Emissions (kgCO2e/kWh)': f"{(optimal_result['emissions_per_kwh'] - optimal_ess_result['emissions_per_kwh']):.3f}"
+        }
 
-        # Savings in a separate row
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric(
-                "ESS Savings",
-                f"{savings/1e6:.1f}M KRW"
-            )
+        if has_carbon_price:
+            savings_row['Electricity Cost (M KRW)'] = f"{(optimal_result['total_cost'] - optimal_ess_result['total_cost'])/1e6:.1f}"
+            savings_row['Carbon Cost (M KRW)'] = f"{(optimal_result['carbon_cost'] - optimal_ess_result['carbon_cost'])/1e6:.1f}"
+            savings_row['Electricity (KRW/kWh)'] = f"{(optimal_result['total_cost_per_kwh'] - optimal_ess_result['total_cost_per_kwh']):.2f}"
+            savings_row['Carbon (KRW/kWh)'] = f"{(optimal_result['carbon_cost_per_kwh'] - optimal_ess_result['carbon_cost_per_kwh']):.2f}"
+
+        summary_data.append(savings_row)
+
+    # Display as DataFrame
+    summary_df = pd.DataFrame(summary_data)
+    st.dataframe(summary_df, width='stretch', hide_index=True)
 
     st.divider()
 
