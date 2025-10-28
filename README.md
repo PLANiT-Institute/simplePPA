@@ -97,7 +97,7 @@ from libs.config import load_config_from_file
 config = load_config_from_file('my_config.json')
 ```
 
-3. **Example config** (see `example_config.json`):
+3. **App settings** (see `app_settings.json`):
 ```json
 {
   "load_capacity_mw": 3000,
@@ -582,7 +582,7 @@ simplePPA/
 ├── main_modular.py          # Modular CLI with config support
 ├── main.py                  # Legacy CLI script
 ├── gui_app.py               # Legacy Tkinter GUI
-├── example_config.json      # Example configuration file
+├── app_settings.json        # App-level settings (limits, defaults)
 ├── requirements.txt         # Python dependencies
 ├── libs/                    # Modular library components
 │   ├── calculator.py        # Core calculation engine

@@ -91,6 +91,40 @@ def load_config_from_file(filepath):
     return config
 
 
+def load_app_settings(filepath="app_settings.json"):
+    """
+    Load application-level settings (e.g., limits) from a JSON file.
+
+    Parameters
+    ----------
+    filepath : str
+        Path to settings JSON file
+
+    Returns
+    -------
+    dict
+        Settings with defaults applied when file is missing
+    """
+    import json
+    import os
+
+    settings = {
+        'max_analysis_days': 31,
+    }
+
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, 'r') as f:
+                user_settings = json.load(f)
+                if isinstance(user_settings, dict):
+                    settings.update(user_settings)
+        except Exception:
+            # Ignore settings load errors and use defaults
+            pass
+
+    return settings
+
+
 def save_config_to_file(config, filepath):
     """
     Save configuration to file.
@@ -173,10 +207,19 @@ def validate_config(config):
     # Validate dates
     try:
         from datetime import datetime
-        datetime.strptime(config['start_date'], '%Y-%m-%d')
-        datetime.strptime(config['end_date'], '%Y-%m-%d')
+        start_dt = datetime.strptime(config['start_date'], '%Y-%m-%d')
+        end_dt = datetime.strptime(config['end_date'], '%Y-%m-%d')
     except ValueError:
         errors.append("Dates must be in YYYY-MM-DD format")
+    else:
+        if end_dt < start_dt:
+            errors.append("end_date must be on or after start_date")
+        else:
+            max_days = int(config.get('max_analysis_days', 31))
+            # Inclusive range length
+            num_days = (end_dt - start_dt).days + 1
+            if num_days > max_days:
+                errors.append(f"Analysis period cannot exceed {max_days} days (selected {num_days} days)")
 
     return len(errors) == 0, errors
 

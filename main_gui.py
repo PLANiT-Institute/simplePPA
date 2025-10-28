@@ -12,7 +12,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 
 import libs.KEPCOutils as kepco
-from libs.config import get_default_config, validate_config
+from libs.config import get_default_config, validate_config, load_app_settings
 from libs.data_processor import (
     load_pattern_data,
     create_analysis_dataframe,
@@ -364,6 +364,7 @@ def run_analysis_tool():
     # Sidebar for configuration
     with st.sidebar:
         st.header("⚙️ Configuration")
+        app_settings = load_app_settings()
 
         # Data Files
         st.subheader("📁 Data Files")
@@ -408,8 +409,15 @@ def run_analysis_tool():
             end_date = st.date_input(
                 "End Date",
                 value=pd.to_datetime("2024-12-31"),
-                help="Last date to include in the analysis period (typically one year)"
+                help=f"Last date to include in the analysis period (max {app_settings.get('max_analysis_days', 31)} days)"
             )
+        # Soft guard in UI for over-long ranges
+        try:
+            num_days = (pd.to_datetime(end_date) - pd.to_datetime(start_date)).days + 1
+            if num_days > int(app_settings.get('max_analysis_days', 31)):
+                st.warning(f"Selected range is {num_days} days. Maximum allowed is {int(app_settings.get('max_analysis_days', 31))} days.")
+        except Exception:
+            pass
 
         st.divider()
 
@@ -594,7 +602,8 @@ def run_analysis_tool():
             'ess_price': ess_price,
             'output_file': output_file,
             'verbose': verbose,
-            'export_long_format': export_long_format
+            'export_long_format': export_long_format,
+            'max_analysis_days': int(app_settings.get('max_analysis_days', 31))
         }
 
         # Validate configuration
