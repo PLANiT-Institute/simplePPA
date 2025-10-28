@@ -38,6 +38,16 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+DEFAULT_PLOTLY_CONFIG = {"responsive": True}
+
+
+def render_plotly_chart(fig, *, use_container_width=True, config=None):
+    """Render a Plotly figure with unified configuration handling."""
+    final_config = DEFAULT_PLOTLY_CONFIG.copy()
+    if config:
+        final_config.update(config)
+    st.plotly_chart(fig, use_container_width=use_container_width, config=final_config)
+
 # Initialize session state
 if 'analysis_done' not in st.session_state:
     st.session_state.analysis_done = False
@@ -144,7 +154,7 @@ def display_documentation():
         ]
     }
 
-    st.dataframe(pd.DataFrame(col_definitions), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(col_definitions), width="stretch", hide_index=True)
 
     st.markdown("**Cost Analysis Columns:**")
 
@@ -177,7 +187,7 @@ def display_documentation():
         ]
     }
 
-    st.dataframe(pd.DataFrame(cost_definitions), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(cost_definitions), width="stretch", hide_index=True)
 
     # How to Use
     st.subheader("🚀 How to Use SimplePPA")
@@ -381,7 +391,7 @@ def run_analysis_tool():
         )
 
         # Review Data Button
-        review_button = st.button("🔍 Review Data", use_container_width=True)
+        review_button = st.button("🔍 Review Data", width="stretch")
 
         st.divider()
 
@@ -554,7 +564,7 @@ def run_analysis_tool():
         st.divider()
 
         # Run Analysis Button
-        run_button = st.button("🚀 Run Analysis", type="primary", use_container_width=True)
+        run_button = st.button("🚀 Run Analysis", type="primary", width="stretch")
 
     # Main content area
     # Review Data functionality
@@ -790,7 +800,7 @@ def review_input_data(pattern_file, kepco_file, kepco_year, kepco_tariff):
             fig.update_yaxes(title_text="Normalized Generation", row=2, col=1)
             fig.update_layout(height=600, showlegend=True)
 
-            st.plotly_chart(fig, use_container_width=True)
+            render_plotly_chart(fig)
 
             # Daily average pattern
             st.subheader("Average Daily Pattern")
@@ -821,11 +831,11 @@ def review_input_data(pattern_file, kepco_file, kepco_year, kepco_tariff):
                     height=400,
                     hovermode='x unified'
                 )
-                st.plotly_chart(fig_daily, use_container_width=True)
+                render_plotly_chart(fig_daily)
 
             # Show data table
             st.subheader("Data Preview (First 100 Rows)")
-            st.dataframe(pattern_df.head(100), use_container_width=True)
+            st.dataframe(pattern_df.head(100), width="stretch")
 
             # Download button
             csv = pattern_df.to_csv()
@@ -870,7 +880,7 @@ def review_input_data(pattern_file, kepco_file, kepco_year, kepco_tariff):
                 height=400,
                 hovermode='x'
             )
-            st.plotly_chart(fig_rate, use_container_width=True)
+            render_plotly_chart(fig_rate)
 
             # Rate distribution
             st.subheader("Rate Distribution")
@@ -886,7 +896,7 @@ def review_input_data(pattern_file, kepco_file, kepco_year, kepco_tariff):
                 yaxis_title="Frequency",
                 height=400
             )
-            st.plotly_chart(fig_hist, use_container_width=True)
+            render_plotly_chart(fig_hist)
 
             # Average rate by hour of day
             st.subheader("Average Rate by Hour of Day")
@@ -910,11 +920,11 @@ def review_input_data(pattern_file, kepco_file, kepco_year, kepco_tariff):
                 yaxis_title="Average Rate (KRW/kWh)",
                 height=400
             )
-            st.plotly_chart(fig_hourly, use_container_width=True)
+            render_plotly_chart(fig_hourly)
 
             # Show data table
             st.subheader("Data Preview (First 100 Rows)")
-            st.dataframe(grid_df.head(100), use_container_width=True)
+            st.dataframe(grid_df.head(100), width="stretch")
 
             # Download button
             csv = grid_df.to_csv()
@@ -931,12 +941,12 @@ def review_input_data(pattern_file, kepco_file, kepco_year, kepco_tariff):
             # Pattern statistics
             st.write("### Load & Solar Pattern Statistics")
             stats_df = pattern_df.describe()
-            st.dataframe(stats_df, use_container_width=True)
+            st.dataframe(stats_df, width="stretch")
 
             # Grid rate statistics
             st.write("### Grid Rate Statistics")
             grid_stats_df = grid_df['rate'].describe().to_frame()
-            st.dataframe(grid_stats_df, use_container_width=True)
+            st.dataframe(grid_stats_df, width="stretch")
 
             # Correlation if datetime index available
             st.write("### Pattern Correlation")
@@ -1071,7 +1081,7 @@ def display_results():
 
         if 'annual_summary_df' in st.session_state:
             st.subheader("Annual Summary")
-            st.dataframe(st.session_state.annual_summary_df, use_container_width=True)
+            st.dataframe(st.session_state.annual_summary_df, width="stretch")
 
         if 'peak_analysis' in st.session_state:
             st.subheader("Peak Hour Analysis")
@@ -1190,7 +1200,7 @@ def plot_cost_analysis(results_summary):
         )
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    render_plotly_chart(fig)
 
 
 def plot_cost_breakdown(results_summary):
@@ -1254,7 +1264,7 @@ def plot_cost_breakdown(results_summary):
         height=500
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    render_plotly_chart(fig)
 
 
 def plot_ess_comparison(results_no_ess, results_ess):
@@ -1307,7 +1317,7 @@ def plot_ess_comparison(results_no_ess, results_ess):
         height=500
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    render_plotly_chart(fig)
 
 
 def display_results_table(results_summary):
@@ -1345,7 +1355,7 @@ def display_results_table(results_summary):
             'Emissions (kgCO2e/kWh)': df['emissions_per_kwh'].round(3)
         })
 
-    st.dataframe(display_df, use_container_width=True)
+    st.dataframe(display_df, width="stretch")
 
 
 def display_peak_analysis(peak_analysis):
