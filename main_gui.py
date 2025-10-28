@@ -370,24 +370,24 @@ def run_analysis_tool():
         st.subheader("📁 Data Files")
         pattern_file = st.text_input(
             "Pattern File",
-            value="data/pattern.xlsx",
+            value=st.session_state.config.get('pattern_file', 'data/pattern.xlsx'),
             help="Excel file containing normalized hourly load and solar generation patterns (0-1 scale)"
         )
         kepco_file = st.text_input(
             "KEPCO File",
-            value="data/KEPCO.xlsx",
+            value=st.session_state.config.get('kepco_file', 'data/KEPCO.xlsx'),
             help="Excel file with Korean electricity tariff data including rates and contract fees"
         )
         kepco_year = st.number_input(
             "KEPCO Year",
-            value=2024,
+            value=int(st.session_state.config.get('kepco_year', 2024)),
             step=1,
             help="Year for which the tariff applies"
         )
         kepco_tariff = st.selectbox(
             "KEPCO Tariff",
             ["HV_C_III", "HV_C_I", "HV_C_II"],
-            index=0,
+            index=["HV_C_III", "HV_C_I", "HV_C_II"].index(st.session_state.config.get('kepco_tariff', 'HV_C_III')),
             help="High Voltage tariff type:\n- HV_C_I: Option I\n- HV_C_II: Option II\n- HV_C_III: Option III (default)"
         )
 
@@ -402,13 +402,13 @@ def run_analysis_tool():
         with col1:
             start_date = st.date_input(
                 "Start Date",
-                value=pd.to_datetime("2024-01-01"),
+                value=pd.to_datetime(st.session_state.config.get('start_date', '2024-01-01')),
                 help="First date to include in the analysis period"
             )
         with col2:
             end_date = st.date_input(
                 "End Date",
-                value=pd.to_datetime("2024-12-31"),
+                value=pd.to_datetime(st.session_state.config.get('end_date', '2024-12-31')),
                 help=f"Last date to include in the analysis period (max {app_settings.get('max_analysis_days', 31)} days)"
             )
         # Soft guard in UI for over-long ranges
@@ -425,7 +425,7 @@ def run_analysis_tool():
         st.subheader("⚡ Load Parameters")
         load_capacity_mw = st.number_input(
             "Load Capacity (MW)",
-            value=3000.0,
+            value=float(st.session_state.config.get('load_capacity_mw', 3000.0)),
             min_value=0.1,
             step=100.0,
             help="Peak load capacity in megawatts. This scales the normalized load pattern to actual power consumption. Example: 100 MW means when normalized load = 1.0, actual load = 100 MW"
@@ -437,7 +437,7 @@ def run_analysis_tool():
         st.subheader("🌞 PPA Parameters")
         ppa_price = st.number_input(
             "PPA Price (KRW/kWh)",
-            value=170.0,
+            value=float(st.session_state.config.get('ppa_price', 170.0)),
             min_value=0.0,
             step=1.0,
             help="Fixed price per kWh for energy purchased from the PPA solar farm. This is the contracted rate you pay for solar electricity."
@@ -446,20 +446,20 @@ def run_analysis_tool():
             "Minimum Take (%)",
             min_value=0,
             max_value=100,
-            value=100,
+            value=int(st.session_state.config.get('ppa_mintake', 1.0) * 100),
             step=1,
             help="Minimum percentage of PPA generation that MUST be purchased each hour, regardless of need.\n- 100% = Must buy all generation (typical)\n- 80% = Must buy 80%, can optionally buy up to 100% if cheaper than grid\n- Lower values provide flexibility but may cost more"
         ) / 100.0
         ppa_resell = st.checkbox(
             "Allow Reselling",
-            value=False,
+            value=bool(st.session_state.config.get('ppa_resell', False)),
             help="Enable reselling excess PPA energy back to the grid. If disabled, excess energy is wasted (but already paid for)."
         )
         ppa_resellrate = st.slider(
             "Resell Rate (%)",
             min_value=0,
             max_value=100,
-            value=90,
+            value=int(st.session_state.config.get('ppa_resellrate', 0.9) * 100),
             step=1,
             disabled=not ppa_resell,
             help="Percentage of PPA price received when reselling excess energy.\n- 90% = Resell at 90% of what you paid\n- Revenue reduces net PPA cost"
@@ -484,7 +484,7 @@ def run_analysis_tool():
         with col1:
             ppa_range_start = st.number_input(
                 "Start (%)",
-                value=0,
+                value=int(st.session_state.config.get('ppa_range_start', 0)),
                 min_value=0,
                 step=10,
                 help="Starting PPA coverage percentage. 0% means no PPA (grid only), used as baseline."
@@ -492,7 +492,7 @@ def run_analysis_tool():
         with col2:
             ppa_range_end = st.number_input(
                 "End (%)",
-                value=200,
+                value=int(st.session_state.config.get('ppa_range_end', 200)),
                 min_value=0,
                 step=10,
                 help="Ending PPA coverage percentage. 200% means solar farm twice as large as peak load."
@@ -500,7 +500,7 @@ def run_analysis_tool():
         with col3:
             ppa_range_step = st.number_input(
                 "Step (%)",
-                value=10,
+                value=int(st.session_state.config.get('ppa_range_step', 10)),
                 min_value=1,
                 step=1,
                 help="Increment between scenarios. Smaller steps = more detailed analysis but longer computation time.\n- 10% = Fast (21 scenarios for 0-200%)\n- 5% = Medium (41 scenarios)\n- 1% = Detailed (201 scenarios)"
@@ -515,7 +515,7 @@ def run_analysis_tool():
         st.subheader("🌍 Carbon Pricing")
         carbon_price = st.number_input(
             "Carbon Price (KRW/tCO2e)",
-            value=0.0,
+            value=float(st.session_state.config.get('carbon_price', 0.0)),
             min_value=0.0,
             step=1000.0,
             help="Price per ton of CO2 equivalent emissions. Used to calculate the cost of carbon emissions. Set to 0 to exclude carbon pricing from cost analysis."
@@ -527,14 +527,14 @@ def run_analysis_tool():
         st.subheader("🔋 ESS Parameters")
         ess_include = st.checkbox(
             "Include ESS Analysis",
-            value=False,
+            value=bool(st.session_state.config.get('ess_include', False)),
             help="Enable Energy Storage System analysis. ESS stores excess PPA energy for later use, reducing grid purchases and demand charges."
         )
         ess_capacity = st.slider(
             "ESS Capacity (% of solar peak)",
             min_value=0,
             max_value=200,
-            value=50,
+            value=int(st.session_state.config.get('ess_capacity', 0.5) * 100),
             step=10,
             disabled=not ess_include,
             help="ESS storage capacity as percentage of peak solar generation.\n- 50% = Can store up to half of peak solar output\n- 100% = Can store full peak solar output\n- Larger ESS = More flexibility but higher capital cost"
@@ -543,7 +543,7 @@ def run_analysis_tool():
             "ESS Discharge Price (% of PPA price)",
             min_value=0,
             max_value=100,
-            value=50,
+            value=int(st.session_state.config.get('ess_price', 0.5) * 100),
             step=5,
             disabled=not ess_include,
             help="Operating cost for using stored energy, as percentage of PPA price.\n- 50% = Discharging costs 50% of PPA price (typical)\n- Accounts for efficiency losses and O&M costs\n- Does not include capital cost (assumed external)"
@@ -555,17 +555,17 @@ def run_analysis_tool():
         st.subheader("💾 Output Options")
         output_file = st.text_input(
             "Output Filename",
-            value="ppa_analysis_results.xlsx",
+            value=st.session_state.config.get('output_file', 'ppa_analysis_results.xlsx'),
             help="Name of Excel file to save detailed analysis results. Contains hourly data, annual summaries, and cost breakdowns."
         )
         export_long_format = st.checkbox(
             "Export Long Format",
-            value=True,
+            value=bool(st.session_state.config.get('export_long_format', True)),
             help="Generate detailed hourly data for all scenarios in pivot-table-ready format. Enables peak analysis but increases computation time."
         )
         verbose = st.checkbox(
             "Verbose Output",
-            value=False,
+            value=bool(st.session_state.config.get('verbose', False)),
             help="Print detailed statistics for each scenario to console (useful for debugging)"
         )
 

@@ -12,7 +12,8 @@ def get_default_config():
     dict
         Dictionary with all configuration parameters
     """
-    return {
+    # Base defaults (used if app_settings.json is missing or incomplete)
+    base_defaults = {
         # Data files
         'pattern_file': 'data/pattern.xlsx',
         'kepco_file': 'data/KEPCO.xlsx',
@@ -31,6 +32,7 @@ def get_default_config():
         'ppa_mintake': 1.0,        # 1.0 = 100%, 0.5 = 50%
         'ppa_resell': False,       # Allow reselling excess energy
         'ppa_resellrate': 0.9,     # Resale rate as fraction of PPA price
+        'carbon_price': 0.0,       # KRW/tCO2e
 
         # PPA coverage range
         'ppa_range_start': 0,      # Starting percentage
@@ -48,6 +50,22 @@ def get_default_config():
         'verbose': False,          # Print detailed statistics during calculation
         'export_long_format': True,  # Export long-format data for pivot tables
     }
+
+    # Overlay defaults from app_settings.json if present
+    try:
+        app_settings = load_app_settings()
+        user_defaults = app_settings.get('default_analysis_config', {})
+        if isinstance(user_defaults, dict):
+            base_defaults.update(user_defaults)
+    except Exception:
+        # If settings cannot be loaded, continue with base_defaults
+        pass
+
+    # Ensure required keys exist even if missing in settings
+    if 'carbon_price' not in base_defaults:
+        base_defaults['carbon_price'] = 0.0
+
+    return base_defaults
 
 
 def load_config_from_file(filepath):
