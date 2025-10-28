@@ -5,67 +5,15 @@ Configuration management utilities.
 
 def get_default_config():
     """
-    Get default configuration parameters.
+    Get default configuration parameters from app_settings.json.
 
     Returns
     -------
     dict
-        Dictionary with all configuration parameters
+        Dictionary with all configuration parameters loaded from app_settings.json
     """
-    # Base defaults (used if app_settings.json is missing or incomplete)
-    base_defaults = {
-        # Data files
-        'pattern_file': 'data/pattern.xlsx',
-        'kepco_file': 'data/KEPCO.xlsx',
-        'kepco_year': 2024,
-        'kepco_tariff': 'HV_C_III',
-
-        # Analysis timeframe
-        'start_date': '2024-01-01',
-        'end_date': '2024-12-31',
-
-        # Load capacity
-        'load_capacity_mw': 3000,
-
-        # PPA parameters
-        'ppa_price': 170,          # KRW/kWh
-        'ppa_mintake': 1.0,        # 1.0 = 100%, 0.5 = 50%
-        'ppa_resell': False,       # Allow reselling excess energy
-        'ppa_resellrate': 0.9,     # Resale rate as fraction of PPA price
-        'carbon_price': 0.0,       # KRW/tCO2e
-
-        # PPA coverage range
-        'ppa_range_start': 0,      # Starting percentage
-        'ppa_range_end': 200,      # Ending percentage (inclusive)
-        'ppa_range_step': 10,      # Step size
-
-        # ESS parameters
-        'ess_include': False,      # Include ESS in analysis
-        'ess_capacity': 0.5,       # ESS capacity as percentage of solar peak (0.5 = 50%)
-        'ess_price': 0.5,          # ESS discharge cost as fraction of PPA price
-        'ess_hours': 6,            # ESS capacity in hours (alternative sizing method)
-
-        # Output parameters
-        'output_file': 'ppa_analysis_results.xlsx',
-        'verbose': False,          # Print detailed statistics during calculation
-        'export_long_format': True,  # Export long-format data for pivot tables
-    }
-
-    # Overlay defaults from app_settings.json if present
-    try:
-        app_settings = load_app_settings()
-        user_defaults = app_settings.get('default_analysis_config', {})
-        if isinstance(user_defaults, dict):
-            base_defaults.update(user_defaults)
-    except Exception:
-        # If settings cannot be loaded, continue with base_defaults
-        pass
-
-    # Ensure required keys exist even if missing in settings
-    if 'carbon_price' not in base_defaults:
-        base_defaults['carbon_price'] = 0.0
-
-    return base_defaults
+    # Load all defaults from app_settings.json (flat structure)
+    return load_app_settings()
 
 
 def load_config_from_file(filepath):
@@ -111,7 +59,7 @@ def load_config_from_file(filepath):
 
 def load_app_settings(filepath="app_settings.json"):
     """
-    Load application-level settings (e.g., limits) from a JSON file.
+    Load application settings from a JSON file (flat structure).
 
     Parameters
     ----------
@@ -121,26 +69,31 @@ def load_app_settings(filepath="app_settings.json"):
     Returns
     -------
     dict
-        Settings with defaults applied when file is missing
+        Settings loaded from JSON file
+
+    Raises
+    ------
+    FileNotFoundError
+        If the settings file does not exist
+    Exception
+        If the settings file cannot be parsed
     """
     import json
     import os
 
-    settings = {
-        'max_analysis_days': 31,
-    }
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"Settings file not found: {filepath}. Please create app_settings.json with all required configuration parameters.")
 
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, 'r') as f:
-                user_settings = json.load(f)
-                if isinstance(user_settings, dict):
-                    settings.update(user_settings)
-        except Exception:
-            # Ignore settings load errors and use defaults
-            pass
-
-    return settings
+    try:
+        with open(filepath, 'r') as f:
+            settings = json.load(f)
+            if not isinstance(settings, dict):
+                raise ValueError(f"Settings file must contain a JSON object, got {type(settings)}")
+            return settings
+    except json.JSONDecodeError as e:
+        raise Exception(f"Invalid JSON in settings file {filepath}: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Error loading settings from {filepath}: {str(e)}")
 
 
 def save_config_to_file(config, filepath):
