@@ -44,6 +44,9 @@ Place the following files in the `data/` directory:
 - `pattern.xlsx`: Hourly load and solar generation patterns (normalized 0-1)
 - `KEPCO.xlsx`: Grid electricity rates and tariff information
 
+- Data files are located in the google drive
+- https://drive.google.com/drive/folders/1gCht8xR6_xHjzgEEywzPqiHVTzTaAPgf?usp=drive_link
+
 ## Usage
 
 ### 🌐 Streamlit Web GUI (Recommended)
